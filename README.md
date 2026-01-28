@@ -35,4 +35,4 @@ Rezultati idu u `output/` folder - statistike i grafovi.
 
 ## Dodavanje novih podataka
 
-Baci CSV u `data/MATAN/` s imenom tipa `MA1_2025_clean.csv` ili `MA2_2025_clean.csv`. Program automatski pokupi sve.
+CSV ide u `data/MATAN/` s imenom tipa `MA1_2025_clean.csv` ili `MA2_2025_clean.csv`. Program automatski pokupi sve.
