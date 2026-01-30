@@ -93,7 +93,7 @@ def add_computed_columns(df, course):
     return df
 
 
-def detect_grade_rejection(df, course):
+def detect_grade_rejection(df, course, year=None):
     df = df.copy()
     if hasattr(df, "attrs"):
         df.attrs = df.attrs.copy()
@@ -118,7 +118,7 @@ def detect_grade_rejection(df, course):
                 first_pass_points = row[points_col] if points_col in row.index else None
             elif pass_found and points_col in row.index and row[points_col] > 0:
                 df.at[idx, "rejected_grade"] = True
-                old_grade = points_to_grade(first_pass_points)
+                old_grade = points_to_grade(first_pass_points, year)
                 new_grade = row["final_grade"]
                 if old_grade and new_grade:
                     df.at[idx, "grade_change"] = int(new_grade - old_grade)
@@ -127,14 +127,43 @@ def detect_grade_rejection(df, course):
     return df
 
 
-def points_to_grade(points):
-    if pd.isna(points) or points < 45:
+def points_to_grade(points, year=None):
+    """Convert `points` to a grade using year-specific boundaries.
+
+    If `year` is provided and is <= 2022, use the older boundaries:
+      2 - 45, 3 - 55, 4 - 70, 5 - 85
+    Otherwise use the newer boundaries:
+      2 - 50, 3 - 58, 4 - 72, 5 - 86
+    """
+    if pd.isna(points):
         return None
-    elif points < 55:
+
+    try:
+        year_int = int(year) if year is not None else None
+    except Exception:
+        year_int = None
+
+    # Older boundaries for years up to and including 2022
+    if year_int is not None and year_int <= 2022:
+        if points < 45:
+            return None
+        elif points < 55:
+            return 2
+        elif points < 70:
+            return 3
+        elif points < 85:
+            return 4
+        else:
+            return 5
+
+    # Newer boundaries for years after 2022 (or unknown year)
+    if points < 50:
+        return None
+    elif points < 58:
         return 2
-    elif points < 65:
+    elif points < 72:
         return 3
-    elif points < 80:
+    elif points < 86:
         return 4
     else:
         return 5
@@ -192,7 +221,7 @@ def process_all_data(data):
         for year, df in data[course].items():
             df_clean = clean_dataframe(df)
             df_computed = add_computed_columns(df_clean, course)
-            df_final = detect_grade_rejection(df_computed, course)
+            df_final = detect_grade_rejection(df_computed, course, year)
             processed[course][year] = df_final
 
     return processed

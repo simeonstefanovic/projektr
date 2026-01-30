@@ -3,17 +3,18 @@ import numpy as np
 from scipy import stats
 
 
-def detect_pass_threshold(df):
-    passed_df = df[df["passed"]]
-    if len(passed_df) == 0:
-        return 45
-    min_passing = passed_df["final_points"].min()
-    if min_passing >= 48:
-        return 50
-    elif min_passing >= 38:
-        return 40
-    else:
-        return 45
+def detect_pass_threshold(df, year=None):
+
+    try:
+        year_int = int(year) if year is not None else None
+    except Exception:
+        year_int = None
+
+    if year_int is not None:
+        return 45 if year_int <= 2022 else 50
+
+    # If year is unknown, default to 50
+    return 50
 
 
 def single_course_stats(df, course, year):
@@ -25,7 +26,7 @@ def single_course_stats(df, course, year):
     passed_df = df[df["passed"]]
     failed_df = df[~df["passed"]]
 
-    pass_threshold = detect_pass_threshold(df)
+    pass_threshold = detect_pass_threshold(df, year)
 
     result = {
         "year": year,
