@@ -430,6 +430,112 @@ def cross_year_rejections(processed):
     return result
 
 
+def statistical_significance_tests(processed):
+    """
+    Perform statistical significance tests:
+    1. T-test: Is MA2 significantly harder than MA1?
+    2. Linear regression trend analysis for each course
+    """
+    years = sorted(processed["MA1"].keys())
+    
+    ma1_rates = [processed["MA1"][y]["passed"].mean() for y in years]
+    ma2_rates = [processed["MA2"][y]["passed"].mean() for y in years]
+    
+    # T-test
+    t_stat, p_value = stats.ttest_ind(ma1_rates, ma2_rates)
+    
+    # Trend analysis
+    year_nums = list(range(len(years)))
+    ma1_trend = stats.linregress(year_nums, ma1_rates)
+    ma2_trend = stats.linregress(year_nums, ma2_rates)
+    
+    return {
+        "ttest": {
+            "ma1_mean_pass_rate": round(float(np.mean(ma1_rates)), 4),
+            "ma2_mean_pass_rate": round(float(np.mean(ma2_rates)), 4),
+            "t_statistic": round(float(t_stat), 4),
+            "p_value": round(float(p_value), 6),
+            "significant": p_value < 0.05,
+        },
+        "ma1_trend": {
+            "slope_per_year": round(float(ma1_trend.slope), 4),
+            "r_squared": round(float(ma1_trend.rvalue ** 2), 4),
+            "p_value": round(float(ma1_trend.pvalue), 4),
+            "significant": ma1_trend.pvalue < 0.05,
+        },
+        "ma2_trend": {
+            "slope_per_year": round(float(ma2_trend.slope), 4),
+            "r_squared": round(float(ma2_trend.rvalue ** 2), 4),
+            "p_value": round(float(ma2_trend.pvalue), 4),
+            "significant": ma2_trend.pvalue < 0.05,
+        },
+    }
+
+
+def grade_transition_analysis(grade_matrices):
+    """
+    Analyze how grades change from MA1 to MA2.
+    """
+    improved = 0
+    same = 0
+    dropped = 0
+    
+    for year, matrix in grade_matrices.items():
+        for ma1 in [2, 3, 4, 5]:
+            for ma2 in [2, 3, 4, 5]:
+                count = matrix.loc[ma1, ma2] if ma1 in matrix.index and ma2 in matrix.columns else 0
+                if ma2 > ma1:
+                    improved += count
+                elif ma2 == ma1:
+                    same += count
+                else:
+                    dropped += count
+    
+    total = improved + same + dropped
+    return {
+        "improved": int(improved),
+        "same": int(same),
+        "dropped": int(dropped),
+        "improved_pct": round(improved / total * 100, 1) if total > 0 else 0,
+        "same_pct": round(same / total * 100, 1) if total > 0 else 0,
+        "dropped_pct": round(dropped / total * 100, 1) if total > 0 else 0,
+        "total": int(total),
+    }
+
+
+def dropout_analysis(processed):
+    """
+    Analyze students who enrolled but never attempted an exam.
+    """
+    result = {}
+    for course in ["MA1", "MA2"]:
+        total_students = 0
+        never_tried = 0
+        for year, df in processed[course].items():
+            total_students += len(df)
+            never_tried += (df["num_attempts"] == 0).sum()
+        
+        result[course] = {
+            "total_enrolled": int(total_students),
+            "never_attempted": int(never_tried),
+            "dropout_rate": round(never_tried / total_students * 100, 2) if total_students > 0 else 0,
+        }
+    return result
+
+
+def perfect_scores_analysis(processed):
+    """
+    Count students who achieved perfect scores (100 points).
+    """
+    result = {}
+    for course in ["MA1", "MA2"]:
+        perfect = 0
+        for year, df in processed[course].items():
+            perfect += (df["final_points"] == 100).sum()
+        result[course] = int(perfect)
+    return result
+
+
 def compute_all_statistics(processed, merged):
     all_stats = {
         "single_course": {"MA1": {}, "MA2": {}},
@@ -443,6 +549,10 @@ def compute_all_statistics(processed, merged):
         "covid_impact": None,
         "easiest_hardest": None,
         "cross_year_rejections": None,
+        "statistical_tests": None,
+        "grade_transition": None,
+        "dropout": None,
+        "perfect_scores": None,
     }
 
     for course in ["MA1", "MA2"]:
@@ -465,5 +575,9 @@ def compute_all_statistics(processed, merged):
     all_stats["covid_impact"] = covid_impact_analysis(processed)
     all_stats["easiest_hardest"] = easiest_hardest_exams(processed)
     all_stats["cross_year_rejections"] = cross_year_rejections(processed)
+    all_stats["statistical_tests"] = statistical_significance_tests(processed)
+    all_stats["grade_transition"] = grade_transition_analysis(all_stats["grade_matrix"])
+    all_stats["dropout"] = dropout_analysis(processed)
+    all_stats["perfect_scores"] = perfect_scores_analysis(processed)
 
     return all_stats

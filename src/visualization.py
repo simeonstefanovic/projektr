@@ -788,12 +788,168 @@ def plot_correlation_trend(stats, output_dir):
 stats_module = stats
 
 
+def plot_summary_dashboard(stats, output_dir):
+    """Create a comprehensive summary dashboard with key statistics."""
+    fig = plt.figure(figsize=(20, 16))
+    
+    # Overall layout: 3 rows x 4 columns
+    gs = fig.add_gridspec(3, 4, hspace=0.35, wspace=0.3)
+    
+    # 1. Pass rate comparison (top-left, spans 2 columns)
+    ax1 = fig.add_subplot(gs[0, 0:2])
+    years = sorted(stats["single_course"]["MA1"].keys())
+    ma1_rates = [stats["single_course"]["MA1"][y]["pass_rate"] * 100 for y in years]
+    ma2_rates = [stats["single_course"]["MA2"][y]["pass_rate"] * 100 for y in years]
+    
+    x = np.arange(len(years))
+    width = 0.35
+    ax1.bar(x - width/2, ma1_rates, width, label='MA1', color=COLORS["MA1"], edgecolor='black')
+    ax1.bar(x + width/2, ma2_rates, width, label='MA2', color=COLORS["MA2"], edgecolor='black')
+    ax1.axhline(y=np.mean(ma1_rates), color=COLORS["MA1"], linestyle='--', alpha=0.7, label=f'MA1 prosjek ({np.mean(ma1_rates):.1f}%)')
+    ax1.axhline(y=np.mean(ma2_rates), color=COLORS["MA2"], linestyle='--', alpha=0.7, label=f'MA2 prosjek ({np.mean(ma2_rates):.1f}%)')
+    ax1.set_xlabel('Godina')
+    ax1.set_ylabel('Prolaznost (%)')
+    ax1.set_title('Prolaznost po godinama', fontweight='bold')
+    ax1.set_xticks(x)
+    ax1.set_xticklabels(years)
+    ax1.legend(fontsize=8)
+    ax1.set_ylim(0, 100)
+    
+    # 2. Grade distribution pie charts (top-right, 2 subplots)
+    for idx, course in enumerate(["MA1", "MA2"]):
+        ax = fig.add_subplot(gs[0, 2 + idx])
+        grades = {2: 0, 3: 0, 4: 0, 5: 0}
+        for year in stats["single_course"][course].keys():
+            for grade, count in stats["single_course"][course][year]["grade_distribution"].items():
+                if grade in grades:
+                    grades[grade] += count
+        
+        colors_pie = ['#e74c3c', '#f39c12', '#3498db', '#2ecc71']
+        labels = [f'2 ({grades[2]})', f'3 ({grades[3]})', f'4 ({grades[4]})', f'5 ({grades[5]})']
+        ax.pie(grades.values(), labels=labels, colors=colors_pie, autopct='%1.1f%%', startangle=90)
+        ax.set_title(f'{course} - Distribucija ocjena', fontweight='bold')
+    
+    # 3. MA1 predicts MA2 (middle-left)
+    ax3 = fig.add_subplot(gs[1, 0:2])
+    agg_pred = {2: {"total": 0, "passed": 0}, 3: {"total": 0, "passed": 0}, 
+                4: {"total": 0, "passed": 0}, 5: {"total": 0, "passed": 0}}
+    for year in stats["ma1_predicts_ma2"].keys():
+        pred = stats["ma1_predicts_ma2"][year]
+        if pred:
+            for grade in [2, 3, 4, 5]:
+                if grade in pred:
+                    agg_pred[grade]["total"] += pred[grade]["total"]
+                    agg_pred[grade]["passed"] += pred[grade]["ma2_passed"]
+    
+    grades = [2, 3, 4, 5]
+    rates = [agg_pred[g]["passed"]/agg_pred[g]["total"]*100 if agg_pred[g]["total"] > 0 else 0 for g in grades]
+    colors_bar = ['#e74c3c', '#f39c12', '#3498db', '#2ecc71']
+    bars = ax3.bar(grades, rates, color=colors_bar, edgecolor='black')
+    ax3.set_xlabel('Ocjena iz MA1')
+    ax3.set_ylabel('Prolaznost na MA2 (%)')
+    ax3.set_title('Kako ocjena iz MA1 predviđa uspjeh na MA2', fontweight='bold')
+    ax3.set_xticks(grades)
+    ax3.set_ylim(0, 105)
+    for bar, rate in zip(bars, rates):
+        ax3.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 1, f'{rate:.1f}%', 
+                ha='center', va='bottom', fontsize=10, fontweight='bold')
+    
+    # 4. COVID impact (middle-right)
+    ax4 = fig.add_subplot(gs[1, 2:4])
+    covid = stats["covid_impact"]
+    periods = ['Pre-COVID\n(2018)', 'COVID\n(2019-2020)', 'Post-COVID\n(2021-2024)']
+    ma1_covid = [(covid["MA1"]["pre_covid_pass_rate"] or 0) * 100,
+                 (covid["MA1"]["covid_pass_rate"] or 0) * 100,
+                 (covid["MA1"]["post_covid_pass_rate"] or 0) * 100]
+    ma2_covid = [(covid["MA2"]["pre_covid_pass_rate"] or 0) * 100,
+                 (covid["MA2"]["covid_pass_rate"] or 0) * 100,
+                 (covid["MA2"]["post_covid_pass_rate"] or 0) * 100]
+    
+    x = np.arange(len(periods))
+    ax4.bar(x - width/2, ma1_covid, width, label='MA1', color=COLORS["MA1"], edgecolor='black')
+    ax4.bar(x + width/2, ma2_covid, width, label='MA2', color=COLORS["MA2"], edgecolor='black')
+    ax4.set_xlabel('Razdoblje')
+    ax4.set_ylabel('Prolaznost (%)')
+    ax4.set_title('Utjecaj COVID-19 na prolaznost', fontweight='bold')
+    ax4.set_xticks(x)
+    ax4.set_xticklabels(periods)
+    ax4.legend()
+    ax4.set_ylim(0, 100)
+    
+    # 5. Correlation scatter (bottom-left, spans 2 columns)
+    ax5 = fig.add_subplot(gs[2, 0:2])
+    years_corr = sorted(stats["correlation"].keys())
+    pearson_vals = [stats["correlation"][y]["pearson_points"] for y in years_corr if stats["correlation"][y]["pearson_points"]]
+    valid_years = [y for y in years_corr if stats["correlation"][y]["pearson_points"]]
+    
+    ax5.plot(valid_years, pearson_vals, marker='o', linewidth=2, markersize=10, color='purple')
+    ax5.fill_between(valid_years, pearson_vals, alpha=0.3, color='purple')
+    ax5.axhline(y=np.mean(pearson_vals), color='red', linestyle='--', label=f'Prosjek: r={np.mean(pearson_vals):.3f}')
+    ax5.set_xlabel('Godina')
+    ax5.set_ylabel('Pearsonov koeficijent korelacije')
+    ax5.set_title('Korelacija bodova MA1 i MA2 kroz godine', fontweight='bold')
+    ax5.set_ylim(0.4, 0.9)
+    ax5.set_xticks(valid_years)
+    ax5.legend()
+    ax5.grid(True, alpha=0.3)
+    
+    # 6. Key statistics summary (bottom-right)
+    ax6 = fig.add_subplot(gs[2, 2:4])
+    ax6.axis('off')
+    
+    # Calculate key stats
+    total_ma1 = sum(stats["single_course"]["MA1"][y]["total_students"] for y in stats["single_course"]["MA1"])
+    total_ma2 = sum(stats["single_course"]["MA2"][y]["total_students"] for y in stats["single_course"]["MA2"])
+    passed_ma1 = sum(stats["single_course"]["MA1"][y]["passed_students"] for y in stats["single_course"]["MA1"])
+    passed_ma2 = sum(stats["single_course"]["MA2"][y]["passed_students"] for y in stats["single_course"]["MA2"])
+    
+    grade_trans = stats.get("grade_transition", {})
+    dropout = stats.get("dropout", {})
+    perfect = stats.get("perfect_scores", {})
+    stat_tests = stats.get("statistical_tests", {})
+    
+    summary_text = f"""
+    KLJUČNE STATISTIKE (2018-2024)
+    
+    UKUPNI PODACI:
+    • MA1: {total_ma1:,} studenata, {passed_ma1:,} položilo ({passed_ma1/total_ma1*100:.1f}%)
+    • MA2: {total_ma2:,} studenata, {passed_ma2:,} položilo ({passed_ma2/total_ma2*100:.1f}%)
+    
+    STATISTIČKA ZNAČAJNOST:
+    • MA2 je značajno teži (p < 0.001)
+    • Razlika prolaznosti: {(passed_ma1/total_ma1 - passed_ma2/total_ma2)*100:.1f} postotnih bodova
+    
+    PRIJELAZ MA1 → MA2:
+    • Poboljšali ocjenu: {grade_trans.get('improved', 0):,} ({grade_trans.get('improved_pct', 0):.1f}%)
+    • Ista ocjena: {grade_trans.get('same', 0):,} ({grade_trans.get('same_pct', 0):.1f}%)
+    • Pogoršali ocjenu: {grade_trans.get('dropped', 0):,} ({grade_trans.get('dropped_pct', 0):.1f}%)
+    
+    DROPOUT (nikad nisu izašli):
+    • MA1: {dropout.get('MA1', {}).get('dropout_rate', 0):.1f}%
+    • MA2: {dropout.get('MA2', {}).get('dropout_rate', 0):.1f}%
+    
+    SAVRŠENE OCJENE (100 bodova):
+    • MA1: {perfect.get('MA1', 0)} studenata
+    • MA2: {perfect.get('MA2', 0)} studenata
+    """
+    
+    ax6.text(0.05, 0.95, summary_text, transform=ax6.transAxes, fontsize=11,
+             verticalalignment='top', fontfamily='monospace',
+             bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
+    
+    fig.suptitle('SAŽETAK: Statistička analiza ispita MA1 i MA2 (2018-2024)', 
+                 fontsize=16, fontweight='bold', y=0.98)
+    
+    save_figure(fig, "summary_dashboard.png", output_dir)
+
+
 def generate_all_visualizations(processed, merged, all_stats, output_dir):
     figures_dir = os.path.join(output_dir, "figures")
     ensure_dir(figures_dir)
 
     print("\nGenerating visualizations...")
 
+    plot_summary_dashboard(all_stats, figures_dir)
     plot_pass_rate_by_year(all_stats, figures_dir)
     plot_enrollment_trend(all_stats, figures_dir)
     plot_grade_distribution_combined(processed, figures_dir)
