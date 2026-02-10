@@ -63,6 +63,45 @@ def save_summary_csv(stats, output_dir):
     corr_df.to_csv(os.path.join(reports_dir, "correlation_analysis.csv"), index=False)
     print(f"  - correlation_analysis.csv... saved")
 
+    # Save first-enrollment statistics
+    fe_rows = []
+    fe = stats.get("first_enrollment", {})
+    for course in ["MA1", "MA2"]:
+        for year, s in fe.get(course, {}).items():
+            fe_rows.append({"year": year, "course": course, **s})
+    if fe_rows:
+        fe_df = pd.DataFrame(fe_rows)
+        fe_df.to_csv(
+            os.path.join(reports_dir, "first_enrollment_statistics.csv"), index=False
+        )
+        print(f"  - first_enrollment_statistics.csv... saved")
+
+    # Save enrollment distribution
+    ed_rows = []
+    ed = stats.get("enrollment_distribution", {})
+    for course in ["MA1", "MA2"]:
+        for year, year_data in ed.get(course, {}).items():
+            total_dist = year_data.get("total", {})
+            passed_dist = year_data.get("passed", {})
+            for enroll_num, count in sorted(total_dist.items()):
+                passed_count = passed_dist.get(enroll_num, 0)
+                ed_rows.append(
+                    {
+                        "year": year,
+                        "course": course,
+                        "enrollment_number": enroll_num,
+                        "student_count": count,
+                        "passed_count": passed_count,
+                        "pass_rate": round(passed_count / count, 4) if count > 0 else 0,
+                    }
+                )
+    if ed_rows:
+        ed_df = pd.DataFrame(ed_rows)
+        ed_df.to_csv(
+            os.path.join(reports_dir, "enrollment_distribution.csv"), index=False
+        )
+        print(f"  - enrollment_distribution.csv... saved")
+
 
 def print_summary(stats):
     print("\n" + "=" * 50)
@@ -105,6 +144,45 @@ def print_summary(stats):
         print(
             f"Hardest exam: {eh['hardest']['course']} {eh['hardest']['year']} ({eh['hardest']['pass_rate']*100:.1f}%)"
         )
+
+    # Print first-enrollment statistics
+    fe = stats.get("first_enrollment", {})
+    if fe:
+        print("\n" + "-" * 50)
+        print("PRVI UPIS - STATISTIKA (samo brucoši, bez ponavljača)")
+        print("-" * 50)
+        for course in ["MA1", "MA2"]:
+            if course not in fe:
+                continue
+            print(f"\n  {course}:")
+            for year in sorted(fe[course].keys()):
+                s = fe[course][year]
+                print(
+                    f"    {year}: {s['total_first_enrollment']} brucoša, "
+                    f"kontinuirana prolaznost: {s['first_enrollment_continual_rate']*100:.1f}%, "
+                    f"ukupna prolaznost: {s['first_enrollment_pass_rate']*100:.1f}% "
+                    f"(ponavljači: {s['total_repeaters']}, prolaznost: {s['repeater_pass_rate']*100:.1f}%)"
+                )
+
+    # Print enrollment distribution
+    ed = stats.get("enrollment_distribution", {})
+    if ed:
+        print("\n" + "-" * 50)
+        print("DISTRIBUCIJA UPISA (koji put student upisuje predmet)")
+        print("-" * 50)
+        for course in ["MA1", "MA2"]:
+            if course not in ed:
+                continue
+            print(f"\n  {course}:")
+            for year in sorted(ed[course].keys()):
+                total_dist = ed[course][year]["total"]
+                passed_dist = ed[course][year]["passed"]
+                parts = []
+                for n, c in sorted(total_dist.items()):
+                    p = passed_dist.get(n, 0)
+                    rate = p / c * 100 if c > 0 else 0
+                    parts.append(f"{n}. upis: {c} (pol. {p}, {rate:.0f}%)")
+                print(f"    {year}: {', '.join(parts)}")
 
 
 def main():

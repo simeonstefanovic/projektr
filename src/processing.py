@@ -214,15 +214,65 @@ def merge_ma1_ma2(ma1_df, ma2_df):
     return merged
 
 
+def build_student_registry(data):
+    """Build a registry tracking every student's appearances across all years.
+
+    Returns a dict keyed by course ("MA1"/"MA2"), where each value is a dict
+    mapping student_id -> sorted list of years they appear in for that course.
+    """
+    registry = {"MA1": {}, "MA2": {}}
+
+    for course in ["MA1", "MA2"]:
+        for year in sorted(data[course].keys()):
+            df = data[course][year]
+            for sid in df["id"].unique():
+                registry[course].setdefault(sid, []).append(year)
+
+    return registry
+
+
+def add_enrollment_number(data, registry):
+    """Add 'enrollment_number' column to each year's DataFrame.
+
+    enrollment_number = 1 means first time the student appears for this course
+    (i.e. a first-time enrollee / "brucoš"), 2 = second enrollment (repeater), etc.
+    """
+    enriched = {"MA1": {}, "MA2": {}}
+
+    for course in ["MA1", "MA2"]:
+        for year, df in data[course].items():
+            df = df.copy()
+            if hasattr(df, "attrs"):
+                df.attrs = df.attrs.copy()
+
+            def _get_enrollment_num(sid):
+                years_list = registry[course].get(sid, [year])
+                # enrollment_number = position of this year in the sorted list + 1
+                try:
+                    return years_list.index(year) + 1
+                except ValueError:
+                    return 1
+
+            df["enrollment_number"] = df["id"].apply(_get_enrollment_num)
+            enriched[course][year] = df
+
+    return enriched
+
+
 def process_all_data(data):
     processed = {"MA1": {}, "MA2": {}}
 
+    # First pass: clean, compute, detect rejection
     for course in ["MA1", "MA2"]:
         for year, df in data[course].items():
             df_clean = clean_dataframe(df)
             df_computed = add_computed_columns(df_clean, course)
             df_final = detect_grade_rejection(df_computed, course, year)
             processed[course][year] = df_final
+
+    # Second pass: build student registry and add enrollment_number
+    registry = build_student_registry(processed)
+    processed = add_enrollment_number(processed, registry)
 
     return processed
 

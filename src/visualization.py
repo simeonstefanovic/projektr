@@ -791,48 +791,91 @@ stats_module = stats
 def plot_summary_dashboard(stats, output_dir):
     """Create a comprehensive summary dashboard with key statistics."""
     fig = plt.figure(figsize=(20, 16))
-    
+
     # Overall layout: 3 rows x 4 columns
     gs = fig.add_gridspec(3, 4, hspace=0.35, wspace=0.3)
-    
+
     # 1. Pass rate comparison (top-left, spans 2 columns)
     ax1 = fig.add_subplot(gs[0, 0:2])
     years = sorted(stats["single_course"]["MA1"].keys())
     ma1_rates = [stats["single_course"]["MA1"][y]["pass_rate"] * 100 for y in years]
     ma2_rates = [stats["single_course"]["MA2"][y]["pass_rate"] * 100 for y in years]
-    
+
     x = np.arange(len(years))
     width = 0.35
-    ax1.bar(x - width/2, ma1_rates, width, label='MA1', color=COLORS["MA1"], edgecolor='black')
-    ax1.bar(x + width/2, ma2_rates, width, label='MA2', color=COLORS["MA2"], edgecolor='black')
-    ax1.axhline(y=np.mean(ma1_rates), color=COLORS["MA1"], linestyle='--', alpha=0.7, label=f'MA1 prosjek ({np.mean(ma1_rates):.1f}%)')
-    ax1.axhline(y=np.mean(ma2_rates), color=COLORS["MA2"], linestyle='--', alpha=0.7, label=f'MA2 prosjek ({np.mean(ma2_rates):.1f}%)')
-    ax1.set_xlabel('Godina')
-    ax1.set_ylabel('Prolaznost (%)')
-    ax1.set_title('Prolaznost po godinama', fontweight='bold')
+    ax1.bar(
+        x - width / 2,
+        ma1_rates,
+        width,
+        label="MA1",
+        color=COLORS["MA1"],
+        edgecolor="black",
+    )
+    ax1.bar(
+        x + width / 2,
+        ma2_rates,
+        width,
+        label="MA2",
+        color=COLORS["MA2"],
+        edgecolor="black",
+    )
+    ax1.axhline(
+        y=np.mean(ma1_rates),
+        color=COLORS["MA1"],
+        linestyle="--",
+        alpha=0.7,
+        label=f"MA1 prosjek ({np.mean(ma1_rates):.1f}%)",
+    )
+    ax1.axhline(
+        y=np.mean(ma2_rates),
+        color=COLORS["MA2"],
+        linestyle="--",
+        alpha=0.7,
+        label=f"MA2 prosjek ({np.mean(ma2_rates):.1f}%)",
+    )
+    ax1.set_xlabel("Godina")
+    ax1.set_ylabel("Prolaznost (%)")
+    ax1.set_title("Prolaznost po godinama", fontweight="bold")
     ax1.set_xticks(x)
     ax1.set_xticklabels(years)
     ax1.legend(fontsize=8)
     ax1.set_ylim(0, 100)
-    
+
     # 2. Grade distribution pie charts (top-right, 2 subplots)
     for idx, course in enumerate(["MA1", "MA2"]):
         ax = fig.add_subplot(gs[0, 2 + idx])
         grades = {2: 0, 3: 0, 4: 0, 5: 0}
         for year in stats["single_course"][course].keys():
-            for grade, count in stats["single_course"][course][year]["grade_distribution"].items():
+            for grade, count in stats["single_course"][course][year][
+                "grade_distribution"
+            ].items():
                 if grade in grades:
                     grades[grade] += count
-        
-        colors_pie = ['#e74c3c', '#f39c12', '#3498db', '#2ecc71']
-        labels = [f'2 ({grades[2]})', f'3 ({grades[3]})', f'4 ({grades[4]})', f'5 ({grades[5]})']
-        ax.pie(grades.values(), labels=labels, colors=colors_pie, autopct='%1.1f%%', startangle=90)
-        ax.set_title(f'{course} - Distribucija ocjena', fontweight='bold')
-    
+
+        colors_pie = ["#e74c3c", "#f39c12", "#3498db", "#2ecc71"]
+        labels = [
+            f"2 ({grades[2]})",
+            f"3 ({grades[3]})",
+            f"4 ({grades[4]})",
+            f"5 ({grades[5]})",
+        ]
+        ax.pie(
+            grades.values(),
+            labels=labels,
+            colors=colors_pie,
+            autopct="%1.1f%%",
+            startangle=90,
+        )
+        ax.set_title(f"{course} - Distribucija ocjena", fontweight="bold")
+
     # 3. MA1 predicts MA2 (middle-left)
     ax3 = fig.add_subplot(gs[1, 0:2])
-    agg_pred = {2: {"total": 0, "passed": 0}, 3: {"total": 0, "passed": 0}, 
-                4: {"total": 0, "passed": 0}, 5: {"total": 0, "passed": 0}}
+    agg_pred = {
+        2: {"total": 0, "passed": 0},
+        3: {"total": 0, "passed": 0},
+        4: {"total": 0, "passed": 0},
+        5: {"total": 0, "passed": 0},
+    }
     for year in stats["ma1_predicts_ma2"].keys():
         pred = stats["ma1_predicts_ma2"][year]
         if pred:
@@ -840,74 +883,134 @@ def plot_summary_dashboard(stats, output_dir):
                 if grade in pred:
                     agg_pred[grade]["total"] += pred[grade]["total"]
                     agg_pred[grade]["passed"] += pred[grade]["ma2_passed"]
-    
+
     grades = [2, 3, 4, 5]
-    rates = [agg_pred[g]["passed"]/agg_pred[g]["total"]*100 if agg_pred[g]["total"] > 0 else 0 for g in grades]
-    colors_bar = ['#e74c3c', '#f39c12', '#3498db', '#2ecc71']
-    bars = ax3.bar(grades, rates, color=colors_bar, edgecolor='black')
-    ax3.set_xlabel('Ocjena iz MA1')
-    ax3.set_ylabel('Prolaznost na MA2 (%)')
-    ax3.set_title('Kako ocjena iz MA1 predviđa uspjeh na MA2', fontweight='bold')
+    rates = [
+        (
+            agg_pred[g]["passed"] / agg_pred[g]["total"] * 100
+            if agg_pred[g]["total"] > 0
+            else 0
+        )
+        for g in grades
+    ]
+    colors_bar = ["#e74c3c", "#f39c12", "#3498db", "#2ecc71"]
+    bars = ax3.bar(grades, rates, color=colors_bar, edgecolor="black")
+    ax3.set_xlabel("Ocjena iz MA1")
+    ax3.set_ylabel("Prolaznost na MA2 (%)")
+    ax3.set_title("Kako ocjena iz MA1 predviđa uspjeh na MA2", fontweight="bold")
     ax3.set_xticks(grades)
     ax3.set_ylim(0, 105)
     for bar, rate in zip(bars, rates):
-        ax3.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 1, f'{rate:.1f}%', 
-                ha='center', va='bottom', fontsize=10, fontweight='bold')
-    
+        ax3.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height() + 1,
+            f"{rate:.1f}%",
+            ha="center",
+            va="bottom",
+            fontsize=10,
+            fontweight="bold",
+        )
+
     # 4. COVID impact (middle-right)
     ax4 = fig.add_subplot(gs[1, 2:4])
     covid = stats["covid_impact"]
-    periods = ['Pre-COVID\n(2018)', 'COVID\n(2019-2020)', 'Post-COVID\n(2021-2024)']
-    ma1_covid = [(covid["MA1"]["pre_covid_pass_rate"] or 0) * 100,
-                 (covid["MA1"]["covid_pass_rate"] or 0) * 100,
-                 (covid["MA1"]["post_covid_pass_rate"] or 0) * 100]
-    ma2_covid = [(covid["MA2"]["pre_covid_pass_rate"] or 0) * 100,
-                 (covid["MA2"]["covid_pass_rate"] or 0) * 100,
-                 (covid["MA2"]["post_covid_pass_rate"] or 0) * 100]
-    
+    periods = ["Pre-COVID\n(2018)", "COVID\n(2019-2020)", "Post-COVID\n(2021-2024)"]
+    ma1_covid = [
+        (covid["MA1"]["pre_covid_pass_rate"] or 0) * 100,
+        (covid["MA1"]["covid_pass_rate"] or 0) * 100,
+        (covid["MA1"]["post_covid_pass_rate"] or 0) * 100,
+    ]
+    ma2_covid = [
+        (covid["MA2"]["pre_covid_pass_rate"] or 0) * 100,
+        (covid["MA2"]["covid_pass_rate"] or 0) * 100,
+        (covid["MA2"]["post_covid_pass_rate"] or 0) * 100,
+    ]
+
     x = np.arange(len(periods))
-    ax4.bar(x - width/2, ma1_covid, width, label='MA1', color=COLORS["MA1"], edgecolor='black')
-    ax4.bar(x + width/2, ma2_covid, width, label='MA2', color=COLORS["MA2"], edgecolor='black')
-    ax4.set_xlabel('Razdoblje')
-    ax4.set_ylabel('Prolaznost (%)')
-    ax4.set_title('Utjecaj COVID-19 na prolaznost', fontweight='bold')
+    ax4.bar(
+        x - width / 2,
+        ma1_covid,
+        width,
+        label="MA1",
+        color=COLORS["MA1"],
+        edgecolor="black",
+    )
+    ax4.bar(
+        x + width / 2,
+        ma2_covid,
+        width,
+        label="MA2",
+        color=COLORS["MA2"],
+        edgecolor="black",
+    )
+    ax4.set_xlabel("Razdoblje")
+    ax4.set_ylabel("Prolaznost (%)")
+    ax4.set_title("Utjecaj COVID-19 na prolaznost", fontweight="bold")
     ax4.set_xticks(x)
     ax4.set_xticklabels(periods)
     ax4.legend()
     ax4.set_ylim(0, 100)
-    
+
     # 5. Correlation scatter (bottom-left, spans 2 columns)
     ax5 = fig.add_subplot(gs[2, 0:2])
     years_corr = sorted(stats["correlation"].keys())
-    pearson_vals = [stats["correlation"][y]["pearson_points"] for y in years_corr if stats["correlation"][y]["pearson_points"]]
+    pearson_vals = [
+        stats["correlation"][y]["pearson_points"]
+        for y in years_corr
+        if stats["correlation"][y]["pearson_points"]
+    ]
     valid_years = [y for y in years_corr if stats["correlation"][y]["pearson_points"]]
-    
-    ax5.plot(valid_years, pearson_vals, marker='o', linewidth=2, markersize=10, color='purple')
-    ax5.fill_between(valid_years, pearson_vals, alpha=0.3, color='purple')
-    ax5.axhline(y=np.mean(pearson_vals), color='red', linestyle='--', label=f'Prosjek: r={np.mean(pearson_vals):.3f}')
-    ax5.set_xlabel('Godina')
-    ax5.set_ylabel('Pearsonov koeficijent korelacije')
-    ax5.set_title('Korelacija bodova MA1 i MA2 kroz godine', fontweight='bold')
+
+    ax5.plot(
+        valid_years,
+        pearson_vals,
+        marker="o",
+        linewidth=2,
+        markersize=10,
+        color="purple",
+    )
+    ax5.fill_between(valid_years, pearson_vals, alpha=0.3, color="purple")
+    ax5.axhline(
+        y=np.mean(pearson_vals),
+        color="red",
+        linestyle="--",
+        label=f"Prosjek: r={np.mean(pearson_vals):.3f}",
+    )
+    ax5.set_xlabel("Godina")
+    ax5.set_ylabel("Pearsonov koeficijent korelacije")
+    ax5.set_title("Korelacija bodova MA1 i MA2 kroz godine", fontweight="bold")
     ax5.set_ylim(0.4, 0.9)
     ax5.set_xticks(valid_years)
     ax5.legend()
     ax5.grid(True, alpha=0.3)
-    
+
     # 6. Key statistics summary (bottom-right)
     ax6 = fig.add_subplot(gs[2, 2:4])
-    ax6.axis('off')
-    
+    ax6.axis("off")
+
     # Calculate key stats
-    total_ma1 = sum(stats["single_course"]["MA1"][y]["total_students"] for y in stats["single_course"]["MA1"])
-    total_ma2 = sum(stats["single_course"]["MA2"][y]["total_students"] for y in stats["single_course"]["MA2"])
-    passed_ma1 = sum(stats["single_course"]["MA1"][y]["passed_students"] for y in stats["single_course"]["MA1"])
-    passed_ma2 = sum(stats["single_course"]["MA2"][y]["passed_students"] for y in stats["single_course"]["MA2"])
-    
+    total_ma1 = sum(
+        stats["single_course"]["MA1"][y]["total_students"]
+        for y in stats["single_course"]["MA1"]
+    )
+    total_ma2 = sum(
+        stats["single_course"]["MA2"][y]["total_students"]
+        for y in stats["single_course"]["MA2"]
+    )
+    passed_ma1 = sum(
+        stats["single_course"]["MA1"][y]["passed_students"]
+        for y in stats["single_course"]["MA1"]
+    )
+    passed_ma2 = sum(
+        stats["single_course"]["MA2"][y]["passed_students"]
+        for y in stats["single_course"]["MA2"]
+    )
+
     grade_trans = stats.get("grade_transition", {})
     dropout = stats.get("dropout", {})
     perfect = stats.get("perfect_scores", {})
     stat_tests = stats.get("statistical_tests", {})
-    
+
     summary_text = f"""
     KLJUČNE STATISTIKE (2018-2024)
     
@@ -932,15 +1035,613 @@ def plot_summary_dashboard(stats, output_dir):
     • MA1: {perfect.get('MA1', 0)} studenata
     • MA2: {perfect.get('MA2', 0)} studenata
     """
-    
-    ax6.text(0.05, 0.95, summary_text, transform=ax6.transAxes, fontsize=11,
-             verticalalignment='top', fontfamily='monospace',
-             bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
-    
-    fig.suptitle('SAŽETAK: Statistička analiza ispita MA1 i MA2 (2018-2024)', 
-                 fontsize=16, fontweight='bold', y=0.98)
-    
+
+    ax6.text(
+        0.05,
+        0.95,
+        summary_text,
+        transform=ax6.transAxes,
+        fontsize=11,
+        verticalalignment="top",
+        fontfamily="monospace",
+        bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.8),
+    )
+
+    fig.suptitle(
+        "SAŽETAK: Statistička analiza ispita MA1 i MA2 (2018-2024)",
+        fontsize=16,
+        fontweight="bold",
+        y=0.98,
+    )
+
     save_figure(fig, "summary_dashboard.png", output_dir)
+
+
+def plot_first_enrollment_pass_rate(stats, output_dir):
+    """Plot first-enrollment continual pass rate vs all-students pass rate by year."""
+    fig, axes = plt.subplots(1, 2, figsize=FIGSIZE_WIDE)
+
+    fe = stats["first_enrollment"]
+
+    for idx, course in enumerate(["MA1", "MA2"]):
+        ax = axes[idx]
+        years = sorted(fe[course].keys())
+
+        # First-enrollment continual pass rate
+        fe_cont_rates = [
+            fe[course][y]["first_enrollment_continual_rate"] * 100 for y in years
+        ]
+        # First-enrollment overall pass rate (during that academic year)
+        fe_overall_rates = [
+            fe[course][y]["first_enrollment_pass_rate"] * 100 for y in years
+        ]
+        # All students continual pass rate (includes repeaters)
+        all_cont_rates = [fe[course][y]["all_continual_rate"] * 100 for y in years]
+        # All students overall pass rate
+        all_overall_rates = [fe[course][y]["all_pass_rate"] * 100 for y in years]
+
+        ax.plot(
+            years,
+            fe_cont_rates,
+            marker="o",
+            linewidth=2.5,
+            markersize=8,
+            label="Brucoši - kontinuirana",
+            color="#2ecc71",
+            linestyle="-",
+        )
+        ax.plot(
+            years,
+            fe_overall_rates,
+            marker="s",
+            linewidth=2.5,
+            markersize=8,
+            label="Brucoši - ukupna prolaznost",
+            color="#27ae60",
+            linestyle="--",
+        )
+        ax.plot(
+            years,
+            all_cont_rates,
+            marker="^",
+            linewidth=1.5,
+            markersize=7,
+            label="Svi - kontinuirana",
+            color="#95a5a6",
+            linestyle="-",
+        )
+        ax.plot(
+            years,
+            all_overall_rates,
+            marker="d",
+            linewidth=1.5,
+            markersize=7,
+            label="Svi - ukupna prolaznost",
+            color="#7f8c8d",
+            linestyle="--",
+        )
+
+        ax.set_xlabel("Akademska godina")
+        ax.set_ylabel("Prolaznost (%)")
+        ax.set_title(f"{course} - Prolaznost prvih upisa vs. svi studenti")
+        ax.legend(fontsize=8, loc="best")
+        ax.set_xticks(years)
+        ax.grid(True, alpha=0.3)
+        ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+
+    plt.tight_layout()
+    save_figure(fig, "first_enrollment_pass_rate.png", output_dir)
+
+
+def plot_first_enrollment_detail(stats, output_dir):
+    """Detailed bar chart: for each year, show first-enrollment numbers and rates."""
+    fe = stats["first_enrollment"]
+
+    for course in ["MA1", "MA2"]:
+        years = sorted(fe[course].keys())
+        n = len(years)
+
+        fig, axes = plt.subplots(1, 2, figsize=FIGSIZE_WIDE)
+
+        # Left: stacked bar - total first-enrollment students breakdown
+        ax1 = axes[0]
+        cont_pass = [fe[course][y]["passed_continual_first_enrollment"] for y in years]
+        other_pass = [
+            fe[course][y]["passed_first_enrollment"]
+            - fe[course][y]["passed_continual_first_enrollment"]
+            for y in years
+        ]
+        failed = [
+            fe[course][y]["total_first_enrollment"]
+            - fe[course][y]["passed_first_enrollment"]
+            for y in years
+        ]
+
+        x = np.arange(n)
+        ax1.bar(
+            x,
+            cont_pass,
+            label="Položili kontinuirano",
+            color="#2ecc71",
+            edgecolor="black",
+        )
+        ax1.bar(
+            x,
+            other_pass,
+            bottom=cont_pass,
+            label="Položili na roku",
+            color="#3498db",
+            edgecolor="black",
+        )
+        bottoms = [c + o for c, o in zip(cont_pass, other_pass)]
+        ax1.bar(
+            x,
+            failed,
+            bottom=bottoms,
+            label="Nisu položili",
+            color="#e74c3c",
+            edgecolor="black",
+        )
+
+        ax1.set_xlabel("Akademska godina")
+        ax1.set_ylabel("Broj studenata")
+        ax1.set_title(f"{course} - Ishod prvog upisa (samo brucoši)")
+        ax1.set_xticks(x)
+        ax1.set_xticklabels(years)
+        ax1.legend(fontsize=9)
+        ax1.yaxis.set_major_locator(MaxNLocator(integer=True))
+
+        # Right: percentage view
+        ax2 = axes[1]
+        totals = [fe[course][y]["total_first_enrollment"] for y in years]
+        cont_pct = [c / t * 100 if t > 0 else 0 for c, t in zip(cont_pass, totals)]
+        other_pct = [o / t * 100 if t > 0 else 0 for o, t in zip(other_pass, totals)]
+        failed_pct = [f / t * 100 if t > 0 else 0 for f, t in zip(failed, totals)]
+
+        ax2.bar(x, cont_pct, label="Kontinuirana", color="#2ecc71", edgecolor="black")
+        ax2.bar(
+            x,
+            other_pct,
+            bottom=cont_pct,
+            label="Na roku",
+            color="#3498db",
+            edgecolor="black",
+        )
+        bottoms_pct = [c + o for c, o in zip(cont_pct, other_pct)]
+        ax2.bar(
+            x,
+            failed_pct,
+            bottom=bottoms_pct,
+            label="Pali",
+            color="#e74c3c",
+            edgecolor="black",
+        )
+
+        # Add continual % annotation
+        for i, pct in enumerate(cont_pct):
+            ax2.text(
+                i,
+                pct / 2,
+                f"{pct:.1f}%",
+                ha="center",
+                va="center",
+                fontsize=9,
+                fontweight="bold",
+                color="white",
+            )
+
+        ax2.set_xlabel("Akademska godina")
+        ax2.set_ylabel("Postotak (%)")
+        ax2.set_title(f"{course} - Postotak ishoda prvog upisa")
+        ax2.set_xticks(x)
+        ax2.set_xticklabels(years)
+        ax2.legend(fontsize=9)
+        ax2.set_ylim(0, 100)
+
+        plt.tight_layout()
+        save_figure(fig, f"first_enrollment_detail_{course}.png", output_dir)
+
+
+def plot_enrollment_count_distribution(stats, output_dir):
+    """Stacked bar chart showing how many students are on 1st, 2nd, 3rd, ... enrollment per year."""
+    ed = stats["enrollment_distribution"]
+
+    for course in ["MA1", "MA2"]:
+        years = sorted(ed[course].keys())
+
+        # Gather all enrollment numbers present
+        all_enroll_nums = set()
+        for y in years:
+            all_enroll_nums.update(ed[course][y]["total"].keys())
+        max_enroll = max(all_enroll_nums) if all_enroll_nums else 1
+
+        fig, axes = plt.subplots(1, 2, figsize=FIGSIZE_WIDE)
+
+        # Left: absolute counts stacked bar
+        ax1 = axes[0]
+        x = np.arange(len(years))
+        enroll_colors = [
+            "#2ecc71",
+            "#e74c3c",
+            "#e67e22",
+            "#9b59b6",
+            "#1abc9c",
+            "#f39c12",
+            "#34495e",
+        ]
+        bottoms = np.zeros(len(years))
+
+        for en in range(1, max_enroll + 1):
+            counts = [ed[course][y].get(en, 0) for y in years]
+            label = f"{en}. upis" if en <= 5 else f"{en}. upis"
+            color = enroll_colors[min(en - 1, len(enroll_colors) - 1)]
+            ax1.bar(
+                x, counts, bottom=bottoms, label=label, color=color, edgecolor="black"
+            )
+            bottoms += np.array(counts)
+
+        ax1.set_xlabel("Akademska godina")
+        ax1.set_ylabel("Broj studenata")
+        ax1.set_title(f"{course} - Distribucija upisa (apsolutno)")
+        ax1.set_xticks(x)
+        ax1.set_xticklabels(years)
+        ax1.legend(fontsize=8, loc="upper left")
+        ax1.yaxis.set_major_locator(MaxNLocator(integer=True))
+
+        # Right: percentage stacked bar
+        ax2 = axes[1]
+        totals = np.array([sum(ed[course][y]["total"].values()) for y in years], dtype=float)
+        bottoms_pct = np.zeros(len(years))
+
+        for en in range(1, max_enroll + 1):
+            counts = np.array([ed[course][y]["total"].get(en, 0) for y in years], dtype=float)
+            pcts = np.where(totals > 0, counts / totals * 100, 0)
+            label = f"{en}. upis"
+            color = enroll_colors[min(en - 1, len(enroll_colors) - 1)]
+            bars = ax2.bar(
+                x, pcts, bottom=bottoms_pct, label=label, color=color, edgecolor="black"
+            )
+
+            # Annotate segments > 5%
+            for i, (pct, bot) in enumerate(zip(pcts, bottoms_pct)):
+                if pct > 5:
+                    ax2.text(
+                        i,
+                        bot + pct / 2,
+                        f"{pct:.0f}%",
+                        ha="center",
+                        va="center",
+                        fontsize=8,
+                        fontweight="bold",
+                        color="white",
+                    )
+            bottoms_pct += pcts
+
+        ax2.set_xlabel("Akademska godina")
+        ax2.set_ylabel("Postotak (%)")
+        ax2.set_title(f"{course} - Distribucija upisa (postotci)")
+        ax2.set_xticks(x)
+        ax2.set_xticklabels(years)
+        ax2.legend(fontsize=8, loc="upper left")
+        ax2.set_ylim(0, 100)
+
+        plt.tight_layout()
+        save_figure(fig, f"enrollment_distribution_{course}.png", output_dir)
+
+
+# ---------------------------------------------------------------------------
+#  Table visualizations (rendered as images from CSV/stats data)
+# ---------------------------------------------------------------------------
+
+
+def _render_table_figure(
+    df, title, filename, output_dir, col_widths=None, highlight_cols=None, figscale=1.0
+):
+    """Render a pandas DataFrame as a styled matplotlib table figure."""
+    n_rows, n_cols = df.shape
+    # Dynamic sizing
+    col_w = 1.3 * figscale
+    row_h = 0.42
+    fig_w = max(n_cols * col_w, 8)
+    fig_h = max((n_rows + 2) * row_h, 3)
+
+    fig, ax = plt.subplots(figsize=(fig_w, fig_h))
+    ax.axis("off")
+    ax.set_title(title, fontsize=14, fontweight="bold", pad=20)
+
+    cell_text = df.values.tolist()
+    col_labels = df.columns.tolist()
+
+    table = ax.table(
+        cellText=cell_text,
+        colLabels=col_labels,
+        loc="center",
+        cellLoc="center",
+    )
+    table.auto_set_font_size(False)
+    table.set_fontsize(9)
+
+    # Style header
+    for j in range(n_cols):
+        cell = table[0, j]
+        cell.set_facecolor("#34495e")
+        cell.set_text_props(color="white", fontweight="bold")
+        cell.set_height(0.06)
+
+    # Style rows (alternating)
+    for i in range(1, n_rows + 1):
+        for j in range(n_cols):
+            cell = table[i, j]
+            cell.set_height(0.05)
+            if i % 2 == 0:
+                cell.set_facecolor("#ecf0f1")
+            else:
+                cell.set_facecolor("white")
+            # Highlight specific columns with colour
+            if highlight_cols and col_labels[j] in highlight_cols:
+                cell.set_facecolor("#d5f5e3" if i % 2 == 1 else "#abebc6")
+
+    if col_widths:
+        for j, w in enumerate(col_widths):
+            for i in range(n_rows + 1):
+                table[i, j].set_width(w)
+    else:
+        table.auto_set_column_width(list(range(n_cols)))
+
+    plt.tight_layout()
+    save_figure(fig, filename, output_dir)
+
+
+def plot_table_summary_statistics(stats, output_dir):
+    """Render the summary statistics as a visual table, one per course."""
+    for course in ["MA1", "MA2"]:
+        years = sorted(stats["single_course"][course].keys())
+        rows = []
+        for y in years:
+            s = stats["single_course"][course][y]
+            rows.append(
+                {
+                    "Godina": y,
+                    "Ukupno": s["total_students"],
+                    "Položili": s["passed_students"],
+                    "Pali": s["failed_students"],
+                    "Prolaz. (%)": f"{s['pass_rate']*100:.1f}",
+                    "Prosjek bod.": s["avg_points_passed"],
+                    "Std bod.": s["std_points_passed"],
+                    "Prosjek ocj.": s["avg_grade"],
+                    "Std ocj.": s["std_grade"],
+                    "Medijan bod.": s["median_points"],
+                    "Prosjek pok.": s["avg_attempts_to_pass"],
+                    "Odbili ocj.": s["students_rejected_grade"],
+                    "Pali (izašli)": s["failed_students_with_attempts"],
+                    "Nikad izašli": s["failed_never_tried"],
+                }
+            )
+        df = pd.DataFrame(rows)
+        _render_table_figure(
+            df,
+            f"{course} — Sažetak statistika po godinama",
+            f"table_summary_{course}.png",
+            output_dir,
+            highlight_cols=["Prolaz. (%)", "Prosjek ocj."],
+        )
+
+
+def plot_table_correlation(stats, output_dir):
+    """Render correlation analysis as a visual table."""
+    years = sorted(stats["correlation"].keys())
+    rows = []
+    for y in years:
+        c = stats["correlation"][y]
+        rows.append(
+            {
+                "Godina": y,
+                "Pearson (bod.)": c["pearson_points"] if c["pearson_points"] else "—",
+                "Pearson (ocj.)": c["pearson_grades"] if c["pearson_grades"] else "—",
+                "Spearman (ocj.)": (
+                    c["spearman_grades"] if c["spearman_grades"] else "—"
+                ),
+                "Oba pol.": c["students_both_passed"],
+                "Samo MA1": c["students_ma1_only"],
+                "Samo MA2": c["students_ma2_only"],
+                "Nijedan": c["students_neither"],
+                "MA2 prije MA1": c["ma2_before_ma1"],
+                "Regr. nagib": c["regression_slope"] if c["regression_slope"] else "—",
+                "R²": c["r_squared"] if c["r_squared"] else "—",
+            }
+        )
+    df = pd.DataFrame(rows)
+    _render_table_figure(
+        df,
+        "Korelacijska analiza MA1 vs MA2 po godinama",
+        "table_correlation.png",
+        output_dir,
+        highlight_cols=["Pearson (bod.)", "R²"],
+    )
+
+
+def plot_table_first_enrollment(stats, output_dir):
+    """Render first-enrollment statistics as a visual table, one per course."""
+    fe = stats["first_enrollment"]
+    for course in ["MA1", "MA2"]:
+        years = sorted(fe[course].keys())
+        rows = []
+        for y in years:
+            s = fe[course][y]
+            rows.append(
+                {
+                    "Godina": y,
+                    "Brucoši": s["total_first_enrollment"],
+                    "Polož. kont.": s["passed_continual_first_enrollment"],
+                    "Kont. (%)": f"{s['first_enrollment_continual_rate']*100:.1f}",
+                    "Položili ukup.": s["passed_first_enrollment"],
+                    "Prolaz (%)": f"{s['first_enrollment_pass_rate']*100:.1f}",
+                    "Ponavljači": s["total_repeaters"],
+                    "Pon. položili": s["passed_repeaters"],
+                    "Pon. prolaz (%)": f"{s['repeater_pass_rate']*100:.1f}",
+                    "Svi ukupno": s["total_all"],
+                    "Svi polož.": s["passed_all"],
+                    "Svi prolaz (%)": f"{s['all_pass_rate']*100:.1f}",
+                }
+            )
+        df = pd.DataFrame(rows)
+        _render_table_figure(
+            df,
+            f"{course} — Statistika prvog upisa (brucoši vs. ponavljači)",
+            f"table_first_enrollment_{course}.png",
+            output_dir,
+            highlight_cols=["Kont. (%)", "Prolaz (%)", "Pon. prolaz (%)"],
+        )
+
+
+def plot_table_enrollment_distribution(stats, output_dir):
+    """Render enrollment distribution as a pivot table image, one per course."""
+    ed = stats["enrollment_distribution"]
+    for course in ["MA1", "MA2"]:
+        years = sorted(ed[course].keys())
+        # Gather all possible enrollment numbers
+        all_enroll = set()
+        for y in years:
+            all_enroll.update(ed[course][y]["total"].keys())
+        max_e = max(all_enroll) if all_enroll else 1
+
+        rows = []
+        for y in years:
+            row = {"Godina": y}
+            total = sum(ed[course][y]["total"].values())
+            for e in range(1, max_e + 1):
+                cnt = ed[course][y]["total"].get(e, 0)
+                pct = cnt / total * 100 if total > 0 else 0
+                row[f"{e}. upis"] = f"{cnt} ({pct:.0f}%)" if cnt > 0 else "—"
+            row["Ukupno"] = total
+            rows.append(row)
+        df = pd.DataFrame(rows)
+        _render_table_figure(
+            df,
+            f"{course} — Distribucija broja upisa po godinama",
+            f"table_enrollment_dist_{course}.png",
+            output_dir,
+            highlight_cols=["1. upis"],
+        )
+
+
+def plot_table_enrollment_with_pass_rates(stats, output_dir):
+    """Render enrollment distribution with pass rates: two rows per year.
+
+    Row 1 (white/green): enrollment counts per number (same as before)
+    Row 2 (tinted):      passed counts / pass rate for each enrollment number
+    """
+    ed = stats["enrollment_distribution"]
+
+    for course in ["MA1", "MA2"]:
+        years = sorted(ed[course].keys())
+
+        all_enroll = set()
+        for y in years:
+            all_enroll.update(ed[course][y]["total"].keys())
+        max_e = max(all_enroll) if all_enroll else 1
+
+        # Build column names
+        col_labels = ["Godina"] + [f"{e}. upis" for e in range(1, max_e + 1)] + ["Ukupno"]
+        n_cols = len(col_labels)
+
+        # Build cell data: two rows per year
+        cell_text = []
+        row_types = []  # 'count' or 'pass' — used for styling
+        for y in years:
+            total_all = sum(ed[course][y]["total"].values())
+            passed_all = sum(ed[course][y]["passed"].values())
+
+            # Row 1: enrollment counts
+            count_row = [str(y)]
+            for e in range(1, max_e + 1):
+                cnt = ed[course][y]["total"].get(e, 0)
+                pct = cnt / total_all * 100 if total_all > 0 else 0
+                count_row.append(f"{cnt} ({pct:.0f}%)" if cnt > 0 else "—")
+            count_row.append(str(total_all))
+            cell_text.append(count_row)
+            row_types.append("count")
+
+            # Row 2: passed counts / pass rates
+            pass_row = ["↳ položili"]
+            for e in range(1, max_e + 1):
+                cnt = ed[course][y]["total"].get(e, 0)
+                passed = ed[course][y]["passed"].get(e, 0)
+                if cnt > 0:
+                    rate = passed / cnt * 100
+                    pass_row.append(f"{passed} ({rate:.0f}%)")
+                else:
+                    pass_row.append("—")
+            pass_rate_all = passed_all / total_all * 100 if total_all > 0 else 0
+            pass_row.append(f"{passed_all} ({pass_rate_all:.0f}%)")
+            cell_text.append(pass_row)
+            row_types.append("pass")
+
+        n_rows = len(cell_text)
+
+        # Dynamic figure sizing
+        col_w = 1.3
+        row_h = 0.38
+        fig_w = max(n_cols * col_w, 10)
+        fig_h = max((n_rows + 2) * row_h, 4)
+
+        fig, ax = plt.subplots(figsize=(fig_w, fig_h))
+        ax.axis("off")
+        ax.set_title(
+            f"{course} — Distribucija upisa i prolaznost po rednom broju upisa",
+            fontsize=14, fontweight="bold", pad=20,
+        )
+
+        table = ax.table(
+            cellText=cell_text,
+            colLabels=col_labels,
+            loc="center",
+            cellLoc="center",
+        )
+        table.auto_set_font_size(False)
+        table.set_fontsize(9)
+
+        # Style header
+        for j in range(n_cols):
+            cell = table[0, j]
+            cell.set_facecolor("#34495e")
+            cell.set_text_props(color="white", fontweight="bold")
+            cell.set_height(0.045)
+
+        # Style data rows
+        for i in range(n_rows):
+            rt = row_types[i]
+            table_row = i + 1  # +1 because row 0 is header
+            year_idx = i // 2  # which year block
+
+            for j in range(n_cols):
+                cell = table[table_row, j]
+                cell.set_height(0.04)
+
+                if rt == "count":
+                    # Year count row — alternate by year_idx
+                    if year_idx % 2 == 0:
+                        cell.set_facecolor("white")
+                    else:
+                        cell.set_facecolor("#ecf0f1")
+                    # Highlight 1. upis column
+                    if col_labels[j] == "1. upis":
+                        cell.set_facecolor("#d5f5e3" if year_idx % 2 == 0 else "#abebc6")
+                    cell.set_text_props(fontweight="bold")
+                else:
+                    # Pass-rate row — slightly tinted
+                    if year_idx % 2 == 0:
+                        cell.set_facecolor("#fef9e7")
+                    else:
+                        cell.set_facecolor("#fdebd0")
+                    cell.set_text_props(fontstyle="italic", color="#2c3e50")
+                    # Highlight 1. upis column pass rate too
+                    if col_labels[j] == "1. upis":
+                        cell.set_facecolor("#d4efdf")
+
+        table.auto_set_column_width(list(range(n_cols)))
+        plt.tight_layout()
+        save_figure(fig, f"table_enrollment_pass_{course}.png", output_dir)
 
 
 def generate_all_visualizations(processed, merged, all_stats, output_dir):
@@ -967,3 +1668,15 @@ def generate_all_visualizations(processed, merged, all_stats, output_dir):
     plot_grade_heatmap_combined(all_stats, figures_dir)
     plot_scatter_points_combined(merged, all_stats, figures_dir)
     plot_ma1_predicts_ma2(all_stats, figures_dir)
+
+    # New: first-enrollment and enrollment distribution plots
+    plot_first_enrollment_pass_rate(all_stats, figures_dir)
+    plot_first_enrollment_detail(all_stats, figures_dir)
+    plot_enrollment_count_distribution(all_stats, figures_dir)
+
+    # Table visualizations (rendered images of all CSV/report data)
+    plot_table_summary_statistics(all_stats, figures_dir)
+    plot_table_correlation(all_stats, figures_dir)
+    plot_table_first_enrollment(all_stats, figures_dir)
+    plot_table_enrollment_distribution(all_stats, figures_dir)
+    plot_table_enrollment_with_pass_rates(all_stats, figures_dir)

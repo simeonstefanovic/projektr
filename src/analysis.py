@@ -437,18 +437,18 @@ def statistical_significance_tests(processed):
     2. Linear regression trend analysis for each course
     """
     years = sorted(processed["MA1"].keys())
-    
+
     ma1_rates = [processed["MA1"][y]["passed"].mean() for y in years]
     ma2_rates = [processed["MA2"][y]["passed"].mean() for y in years]
-    
+
     # T-test
     t_stat, p_value = stats.ttest_ind(ma1_rates, ma2_rates)
-    
+
     # Trend analysis
     year_nums = list(range(len(years)))
     ma1_trend = stats.linregress(year_nums, ma1_rates)
     ma2_trend = stats.linregress(year_nums, ma2_rates)
-    
+
     return {
         "ttest": {
             "ma1_mean_pass_rate": round(float(np.mean(ma1_rates)), 4),
@@ -459,13 +459,13 @@ def statistical_significance_tests(processed):
         },
         "ma1_trend": {
             "slope_per_year": round(float(ma1_trend.slope), 4),
-            "r_squared": round(float(ma1_trend.rvalue ** 2), 4),
+            "r_squared": round(float(ma1_trend.rvalue**2), 4),
             "p_value": round(float(ma1_trend.pvalue), 4),
             "significant": ma1_trend.pvalue < 0.05,
         },
         "ma2_trend": {
             "slope_per_year": round(float(ma2_trend.slope), 4),
-            "r_squared": round(float(ma2_trend.rvalue ** 2), 4),
+            "r_squared": round(float(ma2_trend.rvalue**2), 4),
             "p_value": round(float(ma2_trend.pvalue), 4),
             "significant": ma2_trend.pvalue < 0.05,
         },
@@ -479,18 +479,22 @@ def grade_transition_analysis(grade_matrices):
     improved = 0
     same = 0
     dropped = 0
-    
+
     for year, matrix in grade_matrices.items():
         for ma1 in [2, 3, 4, 5]:
             for ma2 in [2, 3, 4, 5]:
-                count = matrix.loc[ma1, ma2] if ma1 in matrix.index and ma2 in matrix.columns else 0
+                count = (
+                    matrix.loc[ma1, ma2]
+                    if ma1 in matrix.index and ma2 in matrix.columns
+                    else 0
+                )
                 if ma2 > ma1:
                     improved += count
                 elif ma2 == ma1:
                     same += count
                 else:
                     dropped += count
-    
+
     total = improved + same + dropped
     return {
         "improved": int(improved),
@@ -514,11 +518,15 @@ def dropout_analysis(processed):
         for year, df in processed[course].items():
             total_students += len(df)
             never_tried += (df["num_attempts"] == 0).sum()
-        
+
         result[course] = {
             "total_enrolled": int(total_students),
             "never_attempted": int(never_tried),
-            "dropout_rate": round(never_tried / total_students * 100, 2) if total_students > 0 else 0,
+            "dropout_rate": (
+                round(never_tried / total_students * 100, 2)
+                if total_students > 0
+                else 0
+            ),
         }
     return result
 
@@ -533,6 +541,97 @@ def perfect_scores_analysis(processed):
         for year, df in processed[course].items():
             perfect += (df["final_points"] == 100).sum()
         result[course] = int(perfect)
+    return result
+
+
+def first_enrollment_stats(processed):
+    """Compute pass-rate statistics for first-time enrollees only (enrollment_number == 1).
+
+    Returns per-course, per-year dict with:
+      - total first-time students
+      - how many passed overall (ISVU)
+      - how many passed on continual assessment
+      - first-enrollment overall pass rate
+      - first-enrollment continual pass rate
+    """
+    from src.processing import get_exam_columns
+
+    result = {"MA1": {}, "MA2": {}}
+
+    for course in ["MA1", "MA2"]:
+        for year, df in processed[course].items():
+            first = df[df["enrollment_number"] == 1]
+            total_first = len(first)
+            passed_first = int(first["passed"].sum())
+            passed_continual_first = int(first["passed_on_continual"].sum())
+
+            # Also compute pass rate for all students (for comparison)
+            total_all = len(df)
+            passed_all = int(df["passed"].sum())
+            passed_continual_all = int(df["passed_on_continual"].sum())
+
+            exams = get_exam_columns(df)
+            # Cumulative pass during first enrollment (all exams, not just continual)
+            # = passed_first already covers this (any exam in first year)
+
+            result[course][year] = {
+                "total_first_enrollment": total_first,
+                "passed_first_enrollment": passed_first,
+                "passed_continual_first_enrollment": passed_continual_first,
+                "first_enrollment_pass_rate": (
+                    round(passed_first / total_first, 4) if total_first > 0 else 0
+                ),
+                "first_enrollment_continual_rate": (
+                    round(passed_continual_first / total_first, 4)
+                    if total_first > 0
+                    else 0
+                ),
+                # All students (for comparison)
+                "total_all": total_all,
+                "passed_all": passed_all,
+                "passed_continual_all": passed_continual_all,
+                "all_pass_rate": (
+                    round(passed_all / total_all, 4) if total_all > 0 else 0
+                ),
+                "all_continual_rate": (
+                    round(passed_continual_all / total_all, 4) if total_all > 0 else 0
+                ),
+                # Repeater stats
+                "total_repeaters": total_all - total_first,
+                "passed_repeaters": passed_all - passed_first,
+                "repeater_pass_rate": (
+                    round((passed_all - passed_first) / (total_all - total_first), 4)
+                    if (total_all - total_first) > 0
+                    else 0
+                ),
+            }
+
+    return result
+
+
+def enrollment_count_distribution(processed):
+    """For each year and course, compute how many students are on their 1st, 2nd, 3rd, ... enrollment.
+
+    Returns per-course, per-year dict with:
+      - 'total': enrollment_number -> count of all students
+      - 'passed': enrollment_number -> count of students who passed
+    """
+    result = {"MA1": {}, "MA2": {}}
+
+    for course in ["MA1", "MA2"]:
+        for year, df in processed[course].items():
+            total_dist = df["enrollment_number"].value_counts().sort_index().to_dict()
+            passed_dist = (
+                df[df["passed"]]["enrollment_number"]
+                .value_counts()
+                .sort_index()
+                .to_dict()
+            )
+            result[course][year] = {
+                "total": {int(k): int(v) for k, v in total_dist.items()},
+                "passed": {int(k): int(v) for k, v in passed_dist.items()},
+            }
+
     return result
 
 
@@ -553,6 +652,8 @@ def compute_all_statistics(processed, merged):
         "grade_transition": None,
         "dropout": None,
         "perfect_scores": None,
+        "first_enrollment": None,
+        "enrollment_distribution": None,
     }
 
     for course in ["MA1", "MA2"]:
@@ -579,5 +680,7 @@ def compute_all_statistics(processed, merged):
     all_stats["grade_transition"] = grade_transition_analysis(all_stats["grade_matrix"])
     all_stats["dropout"] = dropout_analysis(processed)
     all_stats["perfect_scores"] = perfect_scores_analysis(processed)
+    all_stats["first_enrollment"] = first_enrollment_stats(processed)
+    all_stats["enrollment_distribution"] = enrollment_count_distribution(processed)
 
     return all_stats
