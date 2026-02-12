@@ -376,54 +376,30 @@ def easiest_hardest_exams(processed):
 
 def cross_year_rejections(processed):
     """
-    Find students who passed an exam (had 'DA') in year X but didn't finalize
-    (no ISVU Ocjena) and re-enrolled in year X+1.
-    These are students who rejected their grade and had to retake the course.
-    """
-    from src.processing import get_exam_columns
+    Find students who passed at least one exam date (had 'DA' on any exam)
+    but did not have a finalized ISVU grade in that same year.
 
+    Operationally, this uses:
+    - `passed_on_exam` (computed from exam 'prolaz' columns) as the "has DA" signal
+    - `passed == False` as the "no ISVU Ocjena" signal
+
+    Returns per-course, per-year counts and student ids.
+    """
     result = {"MA1": {}, "MA2": {}}
 
     for course in ["MA1", "MA2"]:
         years = sorted(processed[course].keys())
 
-        for i in range(len(years) - 1):
-            year_current = years[i]
-            year_next = years[i + 1]
+        for year in years:
+            df = processed[course][year]
 
-            df_current = processed[course][year_current]
-            df_next = processed[course][year_next]
+            # `passed_on_exam` is non-null when any exam prolaz == DA
+            had_da = df["passed_on_exam"].notna()
+            no_isvu_grade = ~df["passed"]
 
-            # Students who appear in both years
-            ids_current = set(df_current["id"].tolist())
-            ids_next = set(df_next["id"].tolist())
-            common_ids = ids_current & ids_next
-
-            if not common_ids:
-                continue
-
-            # Find students who had 'DA' (passed) on any exam in current year
-            # but didn't finalize (passed = False, meaning no ISVU Ocjena)
-            exams = get_exam_columns(df_current)
-
-            rejected_students = []
-            for student_id in common_ids:
-                student_row = df_current[df_current["id"] == student_id].iloc[0]
-
-                # Check if student had 'DA' on any exam
-                had_da = False
-                for name, points_col, prolaz_col, time_col in exams:
-                    if prolaz_col in student_row.index and student_row[prolaz_col]:
-                        had_da = True
-                        break
-
-                # If they had DA but didn't finalize (passed = False)
-                if had_da and not student_row["passed"]:
-                    rejected_students.append(student_id)
-
-            key = f"{year_current}->{year_next}"
-            result[course][key] = {
-                "count": len(rejected_students),
+            rejected_students = df.loc[had_da & no_isvu_grade, "id"].tolist()
+            result[course][str(year)] = {
+                "count": int(len(rejected_students)),
                 "students": rejected_students,
             }
 

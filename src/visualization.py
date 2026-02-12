@@ -664,17 +664,17 @@ def plot_rejection_analysis(processed, stats, output_dir):
         ax.set_title(f"{course} - Dinamika ocjena nakon odbijanja (ista godina)")
         ax.yaxis.set_major_locator(MaxNLocator(integer=True))
 
-        # Cross-year rejections (students who passed exam but re-enrolled next year)
+        # Students who passed an exam date (DA) but have no ISVU grade (same year)
         ax2 = axes[1, idx]
         cross_year = stats.get("cross_year_rejections", {}).get(course, {})
 
         if cross_year:
-            year_pairs = sorted(cross_year.keys())
-            counts = [cross_year[yp]["count"] for yp in year_pairs]
+            years = sorted(cross_year.keys(), key=lambda y: int(y))
+            counts = [cross_year[y]["count"] for y in years]
 
-            ax2.bar(range(len(year_pairs)), counts, color="#8e44ad", edgecolor="black")
-            ax2.set_xticks(range(len(year_pairs)))
-            ax2.set_xticklabels(year_pairs, rotation=45, ha="right", fontsize=9)
+            ax2.bar(range(len(years)), counts, color="#8e44ad", edgecolor="black")
+            ax2.set_xticks(range(len(years)))
+            ax2.set_xticklabels(years, rotation=45, ha="right", fontsize=9)
 
             total = sum(counts)
             ax2.annotate(
@@ -688,9 +688,9 @@ def plot_rejection_analysis(processed, stats, output_dir):
                 bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.8),
             )
 
-        ax2.set_xlabel("Prijelaz godine")
+        ax2.set_xlabel("Akademska godina")
         ax2.set_ylabel("Broj studenata")
-        ax2.set_title(f"{course} - Prošli ispit, odbili, upisali sljedeću godinu")
+        ax2.set_title(f"{course} - Prosli ispit, odbili ocjenu, pali godinu")
         ax2.yaxis.set_major_locator(MaxNLocator(integer=True))
 
     plt.tight_layout()
